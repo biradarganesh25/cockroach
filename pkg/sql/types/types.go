@@ -322,6 +322,10 @@ var (
 	Bytes = &T{InternalType: InternalType{
 		Family: BytesFamily, Oid: oid.T_bytea, Locale: &emptyLocale}}
 
+	Tuple = &T{InternalType: InternalType{
+		Family: TupleFamily, Oid: oid.T_record, Locale: &emptyLocale}}
+
+
 	// Date is the type of a value specifying year, month, day (with no time
 	// component). There is no timezone associated with it. For example:
 	//

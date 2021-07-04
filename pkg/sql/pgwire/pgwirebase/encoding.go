@@ -24,6 +24,7 @@ import (
 
 	"github.com/cockroachdb/cockroach/pkg/settings"
 	"github.com/cockroachdb/cockroach/pkg/sql/lex"
+	"github.com/cockroachdb/cockroach/pkg/sql/oid"
 	"github.com/cockroachdb/cockroach/pkg/sql/oidext"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"
@@ -493,6 +494,34 @@ func DecodeDatum(
 		}
 	case FormatBinary:
 		switch id {
+		case oid.T_record:
+			numberOfCols := int32(binary.BigEndian.Uint32(b[0:4]))
+			typs := make([]*types.T, 0, numberOfCols)
+			datums := make(tree.Datums, 0,numberOfCols)
+			curByte := 4
+
+			curCol = 0
+			for curCol < numberOfCols {
+				colOid := int32(binary.BigEndian.Uint32(b[curByte:curByte+4]))
+				colType := oid.OidToType[colOid]
+				typs = append(typs, colType)
+				curByte = curByte + 4
+				colLength = int32(binary.BigEndian.Uint32(b[curByte:curByte+4]))
+				curByte = curByte + 4
+				if colLength == -1  {
+					datums = append(datums, datum.DNull)
+				}
+				else {
+					colDatum, err := DecodeDatum(ctx, colType, code, b[curByte:curByte+colLength])
+					curByte = curByte + colLength
+					datums = append(datums, colDatum)
+				}
+				curCol += 1
+
+			tupleTyps := types.MakeTuple(typs)
+			return tree.NewDTuple(tupleTyps, datums...), nil
+
+
 		case oid.T_bool:
 			if len(b) > 0 {
 				switch b[0] {

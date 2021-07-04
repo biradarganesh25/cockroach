@@ -117,6 +117,38 @@ func TestWriteBinaryArray(t *testing.T) {
 	}
 }
 
+func TestNestTupleRoundTrip(t *testing.T) {
+	defer leaktest.AfterTest(t)()
+	defer log.Scope(t).Close(t)
+
+	buf := newWriteBuffer(nil /* bytecount */)
+	// buf.bytecount = metric.NewCounter(metric.Metadata{})
+	i := tree.NewDInt(1234)
+	f := tree.NewDFloat(12.34)
+	s := tree.NewDString("testing")
+	typ := types.MakeTuple([]*types.T{types.Int, types.Float, types.String})
+	t := tree.NewDTuple(typ, i, f, s)
+	for i := 0; i < 10; i++ {
+		if err := d.Append(tree.NewDInt(tree.DInt(i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	defaultConv, defaultLoc := makeTestingConvCfg()
+	buf.writeTextDatum(context.Background(), d, defaultConv, defaultLoc, nil /* t */)
+
+	b := buf.wrapped.Bytes()
+
+	evalCtx := tree.NewTestingEvalContext(cluster.MakeTestingClusterSettings())
+	defer evalCtx.Stop(context.Background())
+	got, err := pgwirebase.DecodeDatum(evalCtx, types.IntArray, pgwirebase.FormatText, b[4:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Compare(evalCtx, d) != 0 {
+		t.Fatalf("expected %s, got %s", d, got)
+	}
+}
 func TestIntArrayRoundTrip(t *testing.T) {
 	defer leaktest.AfterTest(t)()
 	defer log.Scope(t).Close(t)

@@ -237,9 +237,7 @@ func TestEncodings(t *testing.T) {
 			case *tree.DFloat:
 				// Skip floats because postgres rounds them different than Go.
 				continue
-			case *tree.DTuple:
-				// Unsupported.
-				continue
+
 			case *tree.DCollatedString:
 				// Decoding collated strings is unsupported by this test. The encoded
 				// value is the same as a normal string, so decoding it turns it into
@@ -250,6 +248,13 @@ func TestEncodings(t *testing.T) {
 				pgwirebase.FormatText:   tc.TextAsBinary,
 				pgwirebase.FormatBinary: tc.Binary,
 			} {
+
+				if _,ok := tc.Datum(*tree.DTuple); ok && code == pgwirebase.FormatText {
+					// It is not possible to decode text as binary format for TupleFamily as there 
+					// is no type information avaliable. 
+					continue
+				}
+
 				d, err := pgwirebase.DecodeDatum(
 					&evalCtx,
 					types.OidToType[tc.Oid],
